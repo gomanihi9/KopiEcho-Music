@@ -4,199 +4,96 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KopiEcho Music Player</title>
-  <!-- 1. Alexa Web API for Games 公式 Client SDK -->
-  <script src="https://cdn.html.alexa.com/alexa-html-a2s-1.0.0.js"></script>
-  <!-- 2. YouTube IFrame Player API -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background-color: #0d0e15;
-      color: #ffffff;
-      font-family: 'Segoe UI', Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      padding: 16px;
-      overflow: hidden;
-    }
-    .main-layout {
-      display: flex;
-      flex: 1;
-      gap: 20px;
-      height: 75vh;
-    }
-    .player-box {
-      flex: 1.4;
-      background: #000;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    #player {
-      width: 100%;
-      height: 100%;
-    }
-    .info-box {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-    }
-    .status-badge {
-      font-size: 14px;
-      color: #00e676;
-      background: rgba(0, 230, 118, 0.15);
-      padding: 6px 16px;
-      border-radius: 20px;
-      margin-bottom: 16px;
-    }
-    .thumb-img {
-      width: 160px;
-      height: 160px;
-      border-radius: 12px;
-      object-fit: cover;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      background-color: #222; /* 画像がない場合の背景色 */
-    }
-    .song-title {
-      font-size: 22px;
-      font-weight: bold;
-      margin-bottom: 8px;
-      max-width: 90%;
-      word-break: break-all;
-    }
-    .artist-name {
-      font-size: 16px;
-      color: #aaa;
-    }
-    /* 画面下部：受信メッセージのログ表示 */
-    .log-box {
-      height: 20vh;
-      margin-top: 10px;
-      background: #050508;
-      border: 1px solid #222;
-      border-radius: 8px;
-      padding: 8px;
-      font-family: monospace;
-      font-size: 11px;
-      color: #00ff66;
-      overflow-y: auto;
-    }
+    body { background-color: #0d0e15; color: #ffffff; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; padding: 16px; overflow: hidden; }
+    .main-layout { display: flex; flex: 1; gap: 20px; height: 75vh; }
+    .player-box { flex: 1.4; background: #000; border-radius: 12px; overflow: hidden; }
+    #player { width: 100%; height: 100%; }
+    .info-box { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 20px; text-align: center; }
+    .status-badge { font-size: 14px; color: #00e676; background: rgba(0, 230, 118, 0.15); padding: 6px 16px; border-radius: 20px; margin-bottom: 16px; }
+    .thumb-img { width: 160px; height: 160px; border-radius: 12px; object-fit: cover; margin-bottom: 16px; background-color: #222; }
+    .song-title { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+    .artist-name { font-size: 16px; color: #aaa; }
+    .log-box { height: 20vh; margin-top: 10px; background: #050508; border: 1px solid #222; border-radius: 8px; padding: 8px; font-family: monospace; font-size: 11px; color: #00ff66; overflow-y: auto; }
   </style>
 </head>
 <body>
 
   <div class="main-layout">
-    <!-- 左側: YouTube プレイヤー -->
-    <div class="player-box">
-      <div id="player"></div>
-    </div>
-
-    <!-- 右側: メタデータ表示領域 -->
+    <div class="player-box"><div id="player"></div></div>
     <div class="info-box">
-      <div id="status" class="status-badge">Alexa 接続準備中...</div>
-      <!-- 画像ロードエラー回避のため、初期値は1pxの透明画像(Base64)を設定 -->
+      <div id="status" class="status-badge">待機中</div>
       <img id="thumb" class="thumb-img" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Thumbnail">
       <div id="title" class="song-title">マイミュージック</div>
       <div id="artist" class="artist-name">「曲」または「アルバム」と話しかけてください</div>
     </div>
   </div>
-
-  <!-- 下部ログ画面 -->
   <div id="log" class="log-box">[System] 初期化を開始します...</div>
 
   <script>
     let ytPlayer = null;
-    let alexaClient = null;
 
-    // ログ出力関数
     function log(msg) {
       const logBox = document.getElementById('log');
       logBox.innerHTML += `<br>> ${msg}`;
       logBox.scrollTop = logBox.scrollHeight;
     }
 
-    log('スクリプトの実行を開始しました');
+    // URLからパラメータを取得する関数
+    function getUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        action: params.get('action'),
+        id: params.get('id'),
+        title: params.get('title'),
+        artist: params.get('artist'),
+        thumb: params.get('thumb')
+      };
+    }
 
-    // 1. YouTube Iframe API 準備完了時のコールバック
+    // YouTube Iframe API 準備完了時のコールバック
     function onYouTubeIframeAPIReady() {
       log('YouTube API 準備完了');
       ytPlayer = new YT.Player('player', {
         height: '100%',
         width: '100%',
-        playerVars: { 'autoplay': 1, 'controls': 1, 'enablejsapi': 1 },
+        playerVars: { 'autoplay': 1, 'controls': 1 },
         events: {
-          'onReady': () => log('YouTube プレイヤーの準備完了'),
+          'onReady': () => {
+            log('YouTube プレイヤー準備完了');
+            checkUrlAndPlay(); // プレイヤーの準備ができたらURLをチェック
+          },
           'onError': (e) => log('YouTube 再生エラー: Code ' + e.data)
         }
       });
     }
 
-    // 2. Alexa Client SDK の初期化
-    if (typeof Alexa === 'undefined') {
-      log('エラー: Alexa SDKが読み込まれていません。(通信制限の可能性)');
-      document.getElementById('status').innerText = 'SDK読込失敗';
-    } else {
-      log('Alexa SDKの初期化処理を開始します...');
+    // URLを解析して再生を実行
+    function checkUrlAndPlay() {
+      const data = getUrlParams();
       
-      try {
-        Alexa.create({ version: '1.0' }).then((args) => {
-          // ※公式ドキュメント通り args.alexa から取得するように修正
-          alexaClient = args.alexa;
-          
-          if (!alexaClient) {
-            log('エラー: alexaClientオブジェクトが取得できませんでした');
-            return;
-          }
-
-          log('Alexa Client SDK の接続に成功しました！');
-          document.getElementById('status').innerText = 'Alexa 接続完了';
-
-          // Lambda からの HandleMessage 受信処理
-          alexaClient.skill.onMessage((message) => {
-            log('メッセージ受信: ' + message.action);
-
-            if (message.action === 'VOICE_PROMPT') {
-              document.getElementById('status').innerText = message.promptText || '音声入力待ち';
-            } 
-            else if (message.action === 'PLAY_VIDEO') {
-              updateUI(message.title, message.artist, message.thumb, '▶ 再生中 (曲)');
-              if (ytPlayer && ytPlayer.loadVideoById) {
-                ytPlayer.loadVideoById(message.videoId);
-                log('▶ 動画を再生します: ' + message.videoId);
-              }
-            } 
-            else if (message.action === 'PLAY_PLAYLIST') {
-              updateUI(message.title, message.artist, message.thumb, '▶ 再生中 (アルバム)');
-              if (ytPlayer && ytPlayer.loadPlaylist) {
-                ytPlayer.loadPlaylist({ listType: 'playlist', list: message.playlistId });
-                log('▶ プレイリストを再生します: ' + message.playlistId);
-              }
-            }
-          });
-        }).catch((error) => {
-          // Promise内で拒否された際のエラーをキャッチ
-          log('Alexa SDK 接続エラー: ' + JSON.stringify(error));
-          document.getElementById('status').innerText = 'Alexa 接続エラー';
-        });
-      } catch (e) {
-        // スクリプト実行時の致命的エラーをキャッチ
-        log('Alexa.create 実行時例外: ' + e.message);
+      if (!data.id) {
+        log('URLに再生データが含まれていません。音声入力を待機します。');
+        return;
       }
-    }
 
-    // UIメタデータ更新
-    function updateUI(title, artist, thumb, statusText) {
-      if (title) document.getElementById('title').innerText = title;
-      if (artist) document.getElementById('artist').innerText = artist;
-      if (thumb) document.getElementById('thumb').src = thumb;
-      if (statusText) document.getElementById('status').innerText = statusText;
+      log(`データ受信: ${data.action} / ID: ${data.id}`);
+      
+      // UIを更新
+      if (data.title) document.getElementById('title').innerText = decodeURIComponent(data.title);
+      if (data.artist) document.getElementById('artist').innerText = decodeURIComponent(data.artist);
+      if (data.thumb) document.getElementById('thumb').src = decodeURIComponent(data.thumb);
+      
+      // 再生処理
+      if (data.action === 'PLAY_VIDEO') {
+        document.getElementById('status').innerText = '▶ 再生中 (曲)';
+        ytPlayer.loadVideoById(data.id);
+      } else if (data.action === 'PLAY_PLAYLIST') {
+        document.getElementById('status').innerText = '▶ 再生中 (アルバム)';
+        ytPlayer.loadPlaylist({ listType: 'playlist', list: data.id });
+      }
     }
   </script>
 </body>
