@@ -4,138 +4,173 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KopiEcho Music Player</title>
-  <!-- Alexa Web API for Games 公式 Client SDK -->
+  <!-- 1. Alexa Web API for Games 公式 Client SDK -->
   <script src="https://cdn.html.alexa.com/alexa-html-a2s-1.0.0.js"></script>
+  <!-- 2. YouTube IFrame Player API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: #0f0f12;
+      background-color: #0d0e15;
       color: #ffffff;
       font-family: 'Segoe UI', Roboto, sans-serif;
       display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-    .container {
-      display: flex;
-      width: 100%;
-      height: 100%;
-      padding: 20px;
-      gap: 20px;
-    }
-    .player-section {
-      flex: 1.5;
-      display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: #000;
-      border-radius: 16px;
+      height: 100vh;
+      padding: 16px;
       overflow: hidden;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
-    iframe {
+    .main-layout {
+      display: flex;
+      flex: 1;
+      gap: 20px;
+      height: 75vh;
+    }
+    .player-box {
+      flex: 1.4;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    #player {
       width: 100%;
       height: 100%;
-      border: none;
     }
-    .info-section {
+    .info-box {
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      padding: 30px;
+      align-items: center;
       background: rgba(255, 255, 255, 0.05);
-      border-radius: 16px;
-      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
     }
     .status-badge {
       font-size: 14px;
       color: #00e676;
-      background: rgba(0, 230, 118, 0.1);
-      padding: 6px 12px;
+      background: rgba(0, 230, 118, 0.15);
+      padding: 6px 16px;
       border-radius: 20px;
-      width: fit-content;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
-    .thumbnail {
-      width: 180px;
-      height: 180px;
+    .thumb-img {
+      width: 160px;
+      height: 160px;
       border-radius: 12px;
       object-fit: cover;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
-    .title {
-      font-size: 24px;
+    .song-title {
+      font-size: 22px;
       font-weight: bold;
       margin-bottom: 8px;
-      line-height: 1.3;
+      max-width: 90%;
+      word-break: break-all;
     }
-    .artist {
-      font-size: 18px;
+    .artist-name {
+      font-size: 16px;
       color: #aaa;
+    }
+    /* 画面下部：受信メッセージのログ表示（トラブルシューティング用） */
+    .log-box {
+      height: 20vh;
+      margin-top: 10px;
+      background: #050508;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #00ff66;
+      overflow-y: auto;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- 左側: YouTubeプレーヤー -->
-    <div class="player-section">
-      <iframe id="youtube-player" src="about:blank" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+
+  <div class="main-layout">
+    <!-- 左側: YouTube プレイヤー -->
+    <div class="player-box">
+      <div id="player"></div>
     </div>
 
-    <!-- 右側: メタデータ表示部 -->
-    <div class="info-section">
-      <div id="status" class="status-badge">音声入力を待っています...</div>
-      <img id="thumb" class="thumbnail" src="https://via.placeholder.com/180/222222/ffffff?text=Music" alt="Thumbnail">
-      <div id="title" class="title">マイミュージック</div>
-      <div id="artist" class="artist">曲名またはアルバム名を話しかけてください</div>
+    <!-- 右側: メタデータ表示領域 -->
+    <div class="info-box">
+      <div id="status" class="status-badge">Alexa 接続準備中...</div>
+      <img id="thumb" class="thumb-img" src="https://via.placeholder.com/160/1a1a24/ffffff?text=Music" alt="Thumbnail">
+      <div id="title" class="song-title">マイミュージック</div>
+      <div id="artist" class="artist-name">「曲」または「アルバム」と話しかけてください</div>
     </div>
   </div>
 
+  <!-- 下部ログ画面 -->
+  <div id="log" class="log-box">[System] 初期化を開始します...</div>
+
   <script>
+    let ytPlayer = null;
     let alexaClient = null;
 
-    // Alexa Client SDK の初期化
+    function log(msg) {
+      const logBox = document.getElementById('log');
+      logBox.innerHTML += `<br>> ${msg}`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    // 1. YouTube Iframe API 準備完了時のコールバック
+    function onYouTubeIframeAPIReady() {
+      log('YouTube API 準備完了');
+      ytPlayer = new YT.Player('player', {
+        height: '100%',
+        width: '100%',
+        playerVars: { 'autoplay': 1, 'controls': 1, 'enablejsapi': 1 },
+        events: {
+          'onReady': () => log('YouTube プレイヤーの準備が完了しました'),
+          'onError': (e) => log('YouTube 再生エラー: Code ' + e.data)
+        }
+      });
+    }
+
+    // 2. Alexa Client SDK の初期化 (公式ドキュメント仕様)
     Alexa.create({ version: '1.0' }).then((alexa) => {
       alexaClient = alexa;
+      log('Alexa Client SDK の接続成功');
       document.getElementById('status').innerText = 'Alexa 接続完了';
 
-      // Lambda からメッセージ（HandleMessage）が届いたときの処理
+      // 3. Lambda からの HandleMessage 受信処理
       alexa.skill.onMessage((message) => {
-        console.log('Received Message from Lambda:', message);
+        log('メッセージを受信: ' + JSON.stringify(message));
 
         if (message.action === 'VOICE_PROMPT') {
-          document.getElementById('status').innerText = message.promptText || '対話中...';
-        } else if (message.action === 'PLAY_VIDEO') {
-          playVideo(message.videoId, message.title, message.artist, message.thumb);
-        } else if (message.action === 'PLAY_PLAYLIST') {
-          playPlaylist(message.playlistId, message.title, message.artist, message.thumb);
+          document.getElementById('status').innerText = message.promptText || '音声入力待ち';
+        } 
+        else if (message.action === 'PLAY_VIDEO') {
+          updateUI(message.title, message.artist, message.thumb, '▶ 再生中 (曲)');
+          if (ytPlayer && ytPlayer.loadVideoById) {
+            ytPlayer.loadVideoById(message.videoId);
+            log('動画再生コマンド実行: ' + message.videoId);
+          } else {
+            log('エラー: YouTube プレイヤーが未初期化です');
+          }
+        } 
+        else if (message.action === 'PLAY_PLAYLIST') {
+          updateUI(message.title, message.artist, message.thumb, '▶ 再生中 (アルバム)');
+          if (ytPlayer && ytPlayer.loadPlaylist) {
+            ytPlayer.loadPlaylist({ listType: 'playlist', list: message.playlistId });
+            log('プレイリスト再生コマンド実行: ' + message.playlistId);
+          } else {
+            log('エラー: YouTube プレイヤーが未初期化です');
+          }
         }
       });
     }).catch((error) => {
-      console.error('Alexa Client Init Error:', error);
-      document.getElementById('status').innerText = 'Alexa SDK 初期化エラー';
+      log('Alexa SDK 初期化エラー: ' + error);
+      document.getElementById('status').innerText = 'Alexa SDK エラー';
     });
 
-    // 単曲（Video）再生＆UI更新
-    function playVideo(videoId, title, artist, thumb) {
-      const player = document.getElementById('youtube-player');
-      player.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
-
-      updateUI(title, artist, thumb, '▶ 再生中 (曲)');
-    }
-
-    // プレイリスト（Album）再生＆UI更新
-    function playPlaylist(playlistId, title, artist, thumb) {
-      const player = document.getElementById('youtube-player');
-      player.src = `https://www.youtube-nocookie.com/embed?listType=playlist&list=${playlistId}&autoplay=1&enablejsapi=1`;
-
-      updateUI(title, artist, thumb, '▶ 再生中 (アルバム)');
-    }
-
-    // メタデータ（タイトル・アーティスト・画像）更新
+    // UIメタデータ更新
     function updateUI(title, artist, thumb, statusText) {
       if (title) document.getElementById('title').innerText = title;
       if (artist) document.getElementById('artist').innerText = artist;
