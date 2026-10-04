@@ -3,47 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KopiEcho Music Player - Large UI</title>
+    <title>Echo Show 960x480 Music Player</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alexa Presentation for HTML Web API SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/alexa-html-web-api@1.0.0/dist/alexa-html-web-api.js"></script>
     <script src="https://www.youtube.com/iframe_api"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body, html { width: 960px; height: 480px; overflow: hidden; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; background-color: #0d0d12; color: #ffffff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        
+        /* 960x480 固定画面領域の設定 */
+        body, html { 
+            width: 100vw; 
+            height: 100vh; 
+            max-width: 960px; 
+            max-height: 480px; 
+            overflow: hidden; 
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; 
+            background-color: #0a0b10; 
+            color: #ffffff; 
+            margin: 0 auto;
+        }
 
-        #player-container { position: fixed; top: 0; left: 0; width: 960px; height: 480px; z-index: 1; pointer-events: none; opacity: 0.35; }
+        /* YouTube背景プレイヤー */
+        #player-container { position: absolute; top: 0; left: 0; width: 960px; height: 480px; z-index: 1; pointer-events: none; opacity: 0.35; filter: blur(2px); }
         #player-container iframe { width: 960px; height: 540px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: none; }
-        .dark-overlay { position: fixed; top: 0; left: 0; width: 960px; height: 480px; background: radial-gradient(circle at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.88) 100%); z-index: 2; }
+        .dark-overlay { position: absolute; top: 0; left: 0; width: 960px; height: 480px; background: radial-gradient(circle at center, rgba(10,11,16,0.4) 0%, rgba(10,11,16,0.92) 100%); z-index: 2; }
 
-        .main-layout { position: relative; z-index: 3; display: flex; flex-direction: column; width: 960px; height: 480px; padding: 20px 40px; justify-content: center; }
+        /* 960x480 画面いっぱいに広げるレイアウト */
+        .main-layout { position: relative; z-index: 3; display: flex; width: 960px; height: 480px; padding: 24px 32px; gap: 36px; align-items: center; }
         
-        .player-content { display: flex; align-items: center; justify-content: center; gap: 40px; width: 100%; }
-        
-        /* アルバムアート 2倍近くに大型化 (340px) */
-        .album-art-box { width: 340px; height: 340px; border-radius: 28px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); background: #1a1b26; flex-shrink: 0; }
+        /* 左側：大型アルバムアート (340x340px) */
+        .album-art-box { 
+            width: 340px; 
+            height: 340px; 
+            border-radius: 28px; 
+            overflow: hidden; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(255,42,42,0.15); 
+            background: #161722; 
+            flex-shrink: 0; 
+            position: relative;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
         .album-art-box img { width: 100%; height: 100%; object-fit: cover; }
         
-        .meta-controls { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .status-badge { font-size: 14px; color: #1db954; background: rgba(29, 185, 84, 0.2); padding: 6px 16px; border-radius: 20px; width: fit-content; margin-bottom: 12px; font-weight: 700; }
+        /* 右側：楽曲メタ情報＆コントロールパネル */
+        .meta-controls { flex: 1; display: flex; flex-direction: column; justify-content: space-between; height: 340px; min-width: 0; }
         
-        /* 曲名・アーティスト名の大幅拡大 */
-        .song-title { font-size: 40px; font-weight: 800; line-height: 1.15; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .artist-name { font-size: 22px; color: #b3b3b3; font-weight: 600; margin-bottom: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* 上部ステータスバッジ */
+        .top-meta { display: flex; align-items: center; justify-content: space-between; }
+        .status-badge { font-size: 13px; color: #ff3b3b; background: rgba(255, 59, 59, 0.15); border: 1px solid rgba(255, 59, 59, 0.3); padding: 5px 14px; border-radius: 20px; font-weight: 700; letter-spacing: 0.5px; }
+        .track-counter { font-size: 14px; color: #aaa; font-weight: 600; }
 
-        .progress-area { width: 100%; margin-bottom: 24px; }
-        .progress-bar-bg { width: 100%; height: 10px; background: rgba(255, 255, 255, 0.2); border-radius: 5px; cursor: pointer; position: relative; overflow: hidden; }
-        .progress-fill { width: 0%; height: 100%; background: #ff2a2a; border-radius: 5px; transition: width 0.1s linear; }
+        /* タイトル・アーティスト情報 */
+        .song-info { display: flex; flex-direction: column; gap: 6px; }
+        .song-title { font-size: 34px; font-weight: 800; line-height: 1.2; letter-spacing: -0.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: #ffffff; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .artist-name { font-size: 20px; color: #b3b3b3; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+        /* 再生バー */
+        .progress-area { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+        .progress-bar-bg { width: 100%; height: 8px; background: rgba(255, 255, 255, 0.15); border-radius: 4px; cursor: pointer; position: relative; overflow: hidden; }
+        .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ff2a2a, #ff6b6b); border-radius: 4px; transition: width 0.1s linear; }
+        .time-display { display: flex; justify-content: space-between; font-size: 12px; color: #888; font-weight: 600; }
+
+        /* コントロールボタン群 */
         .control-btns { display: flex; align-items: center; gap: 28px; }
-        
-        /* 再生ボタン・アイコンボタンの大型化 */
-        .play-btn { width: 72px; height: 72px; border-radius: 50%; background: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 8px 25px rgba(0,0,0,0.5); transition: transform 0.1s; flex-shrink: 0; }
+        .play-btn { width: 68px; height: 68px; border-radius: 50%; background: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 8px 25px rgba(255,42,42,0.3); transition: transform 0.1s, background-color 0.2s; flex-shrink: 0; }
         .play-btn:active { transform: scale(0.92); }
-        .play-btn svg { fill: #000; width: 32px; height: 32px; }
+        .play-btn svg { fill: #000; width: 30px; height: 30px; margin-left: 2px; }
 
-        .icon-btn { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: rgba(255, 255, 255, 0.8); cursor: pointer; padding: 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background 0.2s, color 0.2s; }
-        .icon-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
-        .icon-btn.active { color: #ff2a2a; background: rgba(255, 42, 42, 0.15); border-color: rgba(255, 42, 42, 0.4); }
-        .icon-btn svg { width: 28px; height: 28px; fill: currentColor; }
+        .icon-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: rgba(255, 255, 255, 0.7); cursor: pointer; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; }
+        .icon-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+        .icon-btn.active { color: #ff2a2a; border-color: #ff2a2a; background: rgba(255,42,42,0.15); }
+        .icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+        /* 右側ミニ・トラックリストパネル（アルバム時表示） */
+        .playlist-preview { display: none; background: rgba(20,21,30,0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 8px 12px; max-height: 90px; overflow-y: auto; }
+        .playlist-preview::-webkit-scrollbar { width: 4px; }
+        .playlist-preview::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+        .track-item { font-size: 13px; color: #aaa; padding: 4px 6px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+        .track-item.active { color: #ff4d4d; font-weight: bold; background: rgba(255,77,77,0.1); }
     </style>
 </head>
 <body>
@@ -52,39 +90,122 @@
     <div id="player-container"><div id="yt-player"></div></div>
     <div class="dark-overlay"></div>
 
+    <!-- 960x480 メイン画面 -->
     <div class="main-layout">
-        <div class="player-content">
-            <!-- アルバムアート（大） -->
-            <div class="album-art-box">
-                <img id="ui-thumb" src="https://placehold.co/400x400/222/fff?text=KopiEcho" alt="Album Art">
-            </div>
-            <!-- メタデータ＆コントロール（大） -->
-            <div class="meta-controls">
-                <div id="status" class="status-badge">音声入力を待っています...</div>
-                <div id="ui-title" class="song-title">KopiEcho Music</div>
-                <div id="ui-artist" class="artist-name">「曲」または「アルバム」と話しかけてください</div>
-                
-                <div class="progress-area">
-                    <div class="progress-bar-bg" onclick="seek(event)">
-                        <div id="ui-progress" class="progress-fill"></div>
-                    </div>
-                </div>
+        <!-- 左側：340px 大型アルバムアート -->
+        <div class="album-art-box">
+            <img id="ui-thumb" src="https://placehold.co/400x400/161722/fff?text=Echo+Show+Music" alt="Album Art">
+        </div>
 
-                <div class="control-btns">
-                    <button id="repeat-btn" class="icon-btn" onclick="toggleRepeat()" title="リピート">
-                        <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
-                    </button>
-                    <button class="play-btn" onclick="togglePlay()" aria-label="再生/一時停止">
-                        <svg id="play-icon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                    </button>
+        <!-- 右側：楽曲メタデータ＆コントロール -->
+        <div class="meta-controls">
+            <!-- 上部ステータス -->
+            <div class="top-meta">
+                <div id="status" class="status-badge">🎤 音声入力を待機中</div>
+                <div id="track-counter" class="track-counter">1 / 1</div>
+            </div>
+
+            <!-- 曲名・アーティスト -->
+            <div class="song-info">
+                <div id="ui-title" class="song-title">曲またはアルバムを指定してください</div>
+                <div id="ui-artist" class="artist-name">「アレクサ、〇〇の曲を再生して」</div>
+            </div>
+
+            <!-- アルバム再生時のミニトラックリスト（キュー表示） -->
+            <div id="playlist-preview" class="playlist-preview"></div>
+
+            <!-- 再生プログレスバー -->
+            <div class="progress-area">
+                <div class="progress-bar-bg" onclick="seek(event)">
+                    <div id="ui-progress" class="progress-fill"></div>
                 </div>
+                <div class="time-display">
+                    <span id="time-curr">0:00</span>
+                    <span id="time-dur">0:00</span>
+                </div>
+            </div>
+
+            <!-- コントロールボタン -->
+            <div class="control-btns">
+                <button id="prev-btn" class="icon-btn" onclick="playPrevTrack()" title="前の曲">
+                    <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                </button>
+                <button class="play-btn" onclick="togglePlay()" aria-label="再生/一時停止">
+                    <svg id="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button id="next-btn" class="icon-btn" onclick="playNextTrack()" title="次の曲">
+                    <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></svg>
+                </button>
+                <button id="repeat-btn" class="icon-btn" onclick="toggleRepeat()" title="リピート">
+                    <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+                </button>
             </div>
         </div>
     </div>
 
     <script>
         let player, isPlaying = false, isRepeat = false;
+        
+        // 🎵 アルバム・連続再生管理用キュー（データベース/配列）
+        let trackQueue = []; 
+        let currentTrackIndex = 0;
 
+        /**
+         * 1. Alexa Presentation for HTML Web API SDK の初期化
+         * Node.js (Lambda) からのメッセージ（曲・アルバムデータ）を受信
+         */
+        if (window.Alexa) {
+            Alexa.create({ version: '1.0' })
+                .then((alexaClient) => {
+                    console.log('Alexa SDK Connected');
+                    alexaClient.message.listen((message) => {
+                        console.log('Received Message from Alexa:', message);
+                        handleAlexaMessage(message);
+                    });
+                })
+                .catch((err) => console.error('Alexa SDK Init Error:', err));
+        }
+
+        /**
+         * 2. Alexaからのメッセージ受信処理
+         */
+        function handleAlexaMessage(msg) {
+            if (!msg) return;
+
+            if (msg.action === 'PLAY_SINGLE_VIDEO') {
+                // 単一の曲データを受信
+                trackQueue = [{
+                    videoId: msg.videoId,
+                    title: msg.title || '不明な楽曲',
+                    artist: msg.artist || '不明なアーティスト',
+                    thumb: msg.thumb || ''
+                }];
+                currentTrackIndex = 0;
+                playCurrentQueueTrack();
+                document.getElementById('status').innerText = '▶ 再生中 (曲)';
+
+            } else if (msg.action === 'PLAY_ALBUM_BATCH') {
+                // ★ アルバムの動画ID配列・メタデータ一括を受信！
+                // msg.tracks = [ { videoId: 'xxx', title: '曲1', artist: '...' }, { videoId: 'yyy', title: '曲2' }, ... ]
+                if (Array.isArray(msg.tracks) && msg.tracks.length > 0) {
+                    trackQueue = msg.tracks;
+                    currentTrackIndex = 0;
+                    playCurrentQueueTrack();
+                    document.getElementById('status').innerText = `▶ アルバム再生中 (${msg.albumTitle || ''})`;
+                }
+
+            } else if (msg.action === 'PLAY_YOUTUBE_PLAYLIST') {
+                // YouTubeのプレイリストID（PLxxxx）を直接ロードする場合
+                document.getElementById('status').innerText = '▶ プレイリスト再生中';
+                if (player && player.loadPlaylist) {
+                    player.loadPlaylist({ listType: 'playlist', list: msg.playlistId });
+                }
+            }
+        }
+
+        /**
+         * 3. URLパラメータからの初期データ取得（ブラウザ直開きテスト用）
+         */
         function getUrlParams() {
             const params = new URLSearchParams(window.location.search);
             return {
@@ -96,17 +217,26 @@
             };
         }
 
+        /**
+         * 4. YouTube Iframe API Ready
+         */
         function onYouTubeIframeAPIReady() {
-            const data = getUrlParams();
-            const initialId = data.id || 'Qxp-TYiShH0';
+            const urlData = getUrlParams();
+            const initialVideoId = urlData.id || 'Qxp-TYiShH0'; // デフォルトテスト曲
 
             player = new YT.Player('yt-player', {
-                videoId: initialId,
-                playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'modestbranding': 1, 'rel': 0, 'loop': 1 },
+                videoId: initialVideoId,
+                playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'modestbranding': 1, 'rel': 0 },
                 events: {
                     'onReady': () => {
-                        if (data.id) {
-                            applyTrackData(data);
+                        if (urlData.id) {
+                            trackQueue = [{
+                                videoId: urlData.id,
+                                title: urlData.title ? decodeURIComponent(urlData.title) : '再生中の楽曲',
+                                artist: urlData.artist ? decodeURIComponent(urlData.artist) : '',
+                                thumb: urlData.thumb ? decodeURIComponent(urlData.thumb) : ''
+                            }];
+                            playCurrentQueueTrack();
                         }
                     },
                     'onStateChange': onPlayerStateChange
@@ -115,47 +245,135 @@
             setInterval(updateProgress, 250);
         }
 
-        function applyTrackData(data) {
-            if (data.title) document.getElementById('ui-title').innerText = decodeURIComponent(data.title);
-            if (data.artist) document.getElementById('ui-artist').innerText = decodeURIComponent(data.artist);
-            if (data.thumb) document.getElementById('ui-thumb').src = decodeURIComponent(data.thumb);
+        /**
+         * 5. キュー内の現在トラックを再生＆画面UI反映
+         */
+        function playCurrentQueueTrack() {
+            if (trackQueue.length === 0) return;
 
-            if (data.action === 'PLAY_PLAYLIST') {
-                document.getElementById('status').innerText = '▶ 再生中 (アルバム)';
-                player.loadPlaylist({ listType: 'playlist', list: data.id });
-            } else {
-                document.getElementById('status').innerText = '▶ 再生中 (曲)';
-                player.loadVideoById(data.id);
+            const current = trackQueue[currentTrackIndex];
+            
+            // UI更新
+            document.getElementById('ui-title').innerText = current.title;
+            document.getElementById('ui-artist').innerText = current.artist || '';
+            if (current.thumb) {
+                document.getElementById('ui-thumb').src = current.thumb;
+            }
+            document.getElementById('track-counter').innerText = `${currentTrackIndex + 1} / ${trackQueue.length}`;
+
+            // プレイリストミニプレビューの更新
+            renderPlaylistPreview();
+
+            // YouTubeプレイヤーロード
+            if (player && player.loadVideoById) {
+                player.loadVideoById(current.videoId);
             }
         }
 
+        /**
+         * 6. アルバムトラック一覧（キュー）のプレビュー表示
+         */
+        function renderPlaylistPreview() {
+            const previewEl = document.getElementById('playlist-preview');
+            if (trackQueue.length <= 1) {
+                previewEl.style.display = 'none';
+                return;
+            }
+
+            previewEl.style.display = 'block';
+            previewEl.innerHTML = '';
+            trackQueue.forEach((tr, idx) => {
+                const item = document.createElement('div');
+                item.className = `track-item ${idx === currentTrackIndex ? 'active' : ''}`;
+                item.innerText = `${idx + 1}. ${tr.title}`;
+                item.onclick = () => {
+                    currentTrackIndex = idx;
+                    playCurrentQueueTrack();
+                };
+                previewEl.appendChild(item);
+            });
+        }
+
+        /**
+         * 7. プレーヤー状態変更イベント（曲終了時の自動次曲再生など）
+         */
         function onPlayerStateChange(event) {
             const icon = document.getElementById('play-icon');
             if (event.data === YT.PlayerState.PLAYING) {
                 isPlaying = true;
-                icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+                icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; // パウズアイコン
             } else if (event.data === YT.PlayerState.ENDED) {
-                if (isRepeat) player.playVideo();
-                else { isPlaying = false; icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; }
+                if (isRepeat) {
+                    player.playVideo();
+                } else if (currentTrackIndex + 1 < trackQueue.length) {
+                    // ★ アルバムの次の曲へ自動遷移！
+                    playNextTrack();
+                } else {
+                    isPlaying = false;
+                    icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; // プレイアイコン
+                }
             } else {
                 isPlaying = false;
                 icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
             }
         }
 
-        function togglePlay() { if (player && player.getPlayerState) isPlaying ? player.pauseVideo() : player.playVideo(); }
-        function toggleRepeat() { isRepeat = !isRepeat; document.getElementById('repeat-btn').classList.toggle('active', isRepeat); }
+        /**
+         * 8. トラック操作（前へ・次へ・再生/一時停止・リピート）
+         */
+        function playNextTrack() {
+            if (currentTrackIndex + 1 < trackQueue.length) {
+                currentTrackIndex++;
+                playCurrentQueueTrack();
+            }
+        }
 
+        function playPrevTrack() {
+            if (currentTrackIndex > 0) {
+                currentTrackIndex--;
+                playCurrentQueueTrack();
+            } else if (player && player.seekTo) {
+                player.seekTo(0);
+            }
+        }
+
+        function togglePlay() { 
+            if (player && player.getPlayerState) {
+                isPlaying ? player.pauseVideo() : player.playVideo(); 
+            }
+        }
+
+        function toggleRepeat() { 
+            isRepeat = !isRepeat; 
+            document.getElementById('repeat-btn').classList.toggle('active', isRepeat); 
+        }
+
+        /**
+         * 9. プログレスバー・再生時間の更新
+         */
         function updateProgress() {
             if (player && player.getCurrentTime && player.getDuration) {
+                const curr = player.getCurrentTime();
                 const dur = player.getDuration();
-                if (dur > 0) document.getElementById('ui-progress').style.width = ((player.getCurrentTime() / dur) * 100) + '%';
+                if (dur > 0) {
+                    document.getElementById('ui-progress').style.width = ((curr / dur) * 100) + '%';
+                    document.getElementById('time-curr').innerText = formatTime(curr);
+                    document.getElementById('time-dur').innerText = formatTime(dur);
+                }
             }
+        }
+
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec < 10 ? '0' : ''}${sec}`;
         }
 
         function seek(e) {
             const rect = e.currentTarget.getBoundingClientRect();
-            if (player && player.getDuration) player.seekTo(((e.clientX - rect.left) / rect.width) * player.getDuration(), true);
+            if (player && player.getDuration) {
+                player.seekTo(((e.clientX - rect.left) / rect.width) * player.getDuration(), true);
+            }
         }
     </script>
 </body>
