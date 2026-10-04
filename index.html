@@ -2,60 +2,137 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KopiEcho Music Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Echo Show & Mobile Music Player v4.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.youtube.com/iframe_api"></script>
+    <!-- Alexa Presentation for HTML Web API SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/alexa-html-web-api@1.0.0/dist/alexa-html-web-api.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body, html { width: 960px; height: 480px; overflow: hidden; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; background-color: #0d0d12; color: #ffffff; }
+        body, html { width: 100vw; height: 100vh; overflow: hidden; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; background-color: #0d0d12; color: #ffffff; }
 
-        #player-container { position: fixed; top: 0; left: 0; width: 960px; height: 480px; z-index: 1; pointer-events: none; opacity: 0.4; }
-        #player-container iframe { width: 960px; height: 540px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: none; }
-        .dark-overlay { position: fixed; top: 0; left: 0; width: 960px; height: 480px; background: radial-gradient(circle at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.85) 100%); z-index: 2; }
+        #player-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; opacity: 0.5; }
+        #player-container iframe { width: 100vw; height: 56.25vw; min-height: 100vh; min-width: 177.77vh; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: none; }
+        .dark-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: radial-gradient(circle at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.92) 100%); z-index: 2; }
 
-        .main-layout { position: relative; z-index: 3; display: flex; flex-direction: column; width: 960px; height: 480px; padding: 24px 36px; justify-content: center; }
+        .main-layout { position: relative; z-index: 3; display: flex; flex-direction: column; width: 100vw; height: 100vh; padding: 16px 24px; gap: 12px; }
         
-        .player-content { display: flex; align-items: center; justify-content: center; gap: 48px; width: 100%; }
-        .album-art-box { width: 220px; height: 220px; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.7); background: #1a1b26; flex-shrink: 0; }
+        /* 上部検索バー */
+        .top-bar { display: flex; gap: 10px; width: 100%; max-width: 800px; margin: 0 auto; align-items: center; z-index: 10; }
+        .search-section { flex: 1; display: flex; gap: 8px; background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(20px); padding: 4px 12px; border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .search-input { flex: 1; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; padding: 6px 4px; min-width: 0; }
+        .search-input::placeholder { color: rgba(255,255,255,0.5); }
+        .search-btn { background: #ff2a2a; color: #fff; border: none; padding: 6px 18px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; transition: transform 0.1s, background 0.2s; flex-shrink: 0; }
+        .search-btn:active { transform: scale(0.95); background: #e02222; }
+
+        .top-icon-btn { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(10px); flex-shrink: 0; transition: background 0.2s; }
+        .top-icon-btn:hover { background: rgba(255, 255, 255, 0.2); }
+        .top-icon-btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+        /* 検索結果パネル */
+        .results-container { display: none; position: absolute; top: 65px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 740px; max-height: 75vh; overflow-y: auto; background: rgba(18, 19, 26, 0.96); backdrop-filter: blur(24px); border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 50px rgba(0,0,0,0.9); z-index: 20; padding: 12px; }
+        .results-container::-webkit-scrollbar { width: 6px; }
+        .results-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+        .section-title { font-size: 12px; color: #ff2a2a; text-transform: uppercase; margin: 10px 8px 6px; font-weight: 700; letter-spacing: 0.5px; }
+        .result-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 12px; cursor: pointer; transition: background 0.15s; }
+        .result-item:hover { background: rgba(255, 255, 255, 0.12); }
+        .result-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #222; flex-shrink: 0; }
+        .result-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .result-title { font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .result-sub { font-size: 12px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .badge { background: rgba(255, 42, 42, 0.2); color: #ff5555; border: 1px solid rgba(255, 42, 42, 0.4); font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 6px; margin-left: auto; flex-shrink: 0; }
+
+        .status-msg { text-align: center; color: #aaa; padding: 24px 12px; font-size: 14px; line-height: 1.5; }
+        .status-msg.error { color: #ff5555; }
+
+        /* モーダル共通 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 100; justify-content: center; align-items: center; padding: 16px; }
+        .modal-overlay.active { display: flex; }
+        .modal-card { background: #161720; border: 1px solid rgba(255,255,255,0.15); width: 100%; max-width: 520px; border-radius: 20px; padding: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; gap: 14px; }
+        .modal-card h3 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .modal-card input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 10px 12px; color: #fff; font-size: 14px; outline: none; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+        .btn-save { background: #ff2a2a; color: #fff; border: none; padding: 8px 18px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .btn-cancel { background: rgba(255,255,255,0.1); color: #ccc; border: none; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; }
+
+        /* プレイヤーメイン領域 (横画面・デスクトップ) */
+        .player-content { flex: 1; display: flex; align-items: center; justify-content: center; gap: 40px; max-width: 900px; margin: 0 auto; width: 100%; min-height: 0; }
+        .album-art-box { width: 280px; height: 280px; border-radius: 24px; overflow: hidden; box-shadow: 0 16px 40px rgba(0,0,0,0.8); background: #1a1b26; flex-shrink: 0; }
         .album-art-box img { width: 100%; height: 100%; object-fit: cover; }
         
-        .meta-controls { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .status-badge { font-size: 12px; color: #1db954; background: rgba(29, 185, 84, 0.15); padding: 4px 12px; border-radius: 20px; width: fit-content; margin-bottom: 10px; font-weight: 600; }
-        .song-title { font-size: 28px; font-weight: 800; line-height: 1.2; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .artist-name { font-size: 16px; color: #b3b3b3; font-weight: 500; margin-bottom: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .meta-controls { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; width: 100%; }
+        .song-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+        .song-title { font-size: 28px; font-weight: 800; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .artist-name { font-size: 16px; color: #bbb; font-weight: 500; margin-bottom: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .fav-artist-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #ccc; padding: 6px 12px; border-radius: 18px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s; flex-shrink: 0; }
+        .fav-artist-btn:hover { background: rgba(255,42,42,0.2); border-color: #ff2a2a; color: #fff; }
+        .fav-artist-btn.saved { background: #ff2a2a; border-color: #ff2a2a; color: #fff; }
 
         .progress-area { width: 100%; margin-bottom: 20px; }
         .progress-bar-bg { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; cursor: pointer; position: relative; overflow: hidden; }
         .progress-fill { width: 0%; height: 100%; background: #ff2a2a; border-radius: 3px; transition: width 0.1s linear; }
 
-        .control-btns { display: flex; align-items: center; gap: 20px; }
-        .play-btn { width: 52px; height: 52px; border-radius: 50%; background: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.4); transition: transform 0.1s; flex-shrink: 0; }
+        .control-btns { display: flex; align-items: center; justify-content: flex-start; gap: 20px; }
+        .play-btn { width: 56px; height: 56px; border-radius: 50%; background: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.4); transition: transform 0.1s; flex-shrink: 0; }
         .play-btn:active { transform: scale(0.92); }
         .play-btn svg { fill: #000; width: 24px; height: 24px; }
 
-        .icon-btn { background: none; border: none; color: rgba(255, 255, 255, 0.5); cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: color 0.2s; }
+        .icon-btn { background: none; border: none; color: rgba(255, 255, 255, 0.6); cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: color 0.2s, transform 0.1s; }
+        .icon-btn:active { transform: scale(0.9); }
         .icon-btn.active { color: #ff2a2a; }
-        .icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+        .icon-btn svg { width: 24px; height: 24px; fill: currentColor; }
+
+        /* 📱 スマホ・縦画面 (モバイル枠組み対応レスポンシブ CSS) */
+        @media (max-width: 768px) {
+            .main-layout { padding: 12px 16px; gap: 16px; }
+            .player-content { flex-direction: column; justify-content: center; gap: 20px; text-align: center; }
+            .album-art-box { width: 220px; height: 220px; border-radius: 20px; }
+            .song-header-row { flex-direction: column; align-items: center; gap: 8px; }
+            .song-title { font-size: 22px; text-align: center; }
+            .artist-name { font-size: 14px; margin-bottom: 16px; text-align: center; }
+            .control-btns { justify-content: center; gap: 24px; }
+        }
     </style>
 </head>
 <body>
 
-    <!-- YouTube 背景プレイヤー -->
+    <!-- YouTube Player -->
     <div id="player-container"><div id="yt-player"></div></div>
     <div class="dark-overlay"></div>
 
     <div class="main-layout">
-        <div class="player-content">
-            <!-- アルバムアート -->
-            <div class="album-art-box">
-                <img id="ui-thumb" src="https://placehold.co/400x400/222/fff?text=KopiEcho" alt="Album Art">
+        <!-- 上部バー -->
+        <div class="top-bar">
+            <button class="top-icon-btn" title="お気に入り" onclick="openFavArtistsModal()">
+                <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </button>
+            <div class="search-section">
+                <input type="text" id="search-input" class="search-input" placeholder="曲名、アーティスト名..." onkeydown="if(event.key==='Enter') executeSearch()">
+                <button class="search-btn" onclick="executeSearch()">検索</button>
             </div>
-            <!-- メタデータ＆コントロール -->
+            <button class="top-icon-btn" title="APIキー設定" onclick="openApiKeyModal()">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </button>
+        </div>
+
+        <!-- 検索結果パネル -->
+        <div id="results-list" class="results-container"></div>
+
+        <!-- プレイヤー中央画面 -->
+        <div class="player-content">
+            <div class="album-art-box">
+                <img id="ui-thumb" src="https://placehold.co/400x400/222/fff?text=Music+Player" alt="Album Art">
+            </div>
             <div class="meta-controls">
-                <div id="status" class="status-badge">音声入力を待っています...</div>
-                <div id="ui-title" class="song-title">KopiEcho Music</div>
-                <div id="ui-artist" class="artist-name">「曲」または「アルバム」と話しかけてください</div>
+                <div class="song-header-row">
+                    <div id="ui-title" class="song-title">曲を選択してください</div>
+                    <button id="fav-btn" class="fav-artist-btn" onclick="toggleCurrentArtistFavorite()">
+                        <span>⭐ アーティスト登録</span>
+                    </button>
+                </div>
+                <div id="ui-artist" class="artist-name">Alexa Music Player</div>
                 
                 <div class="progress-area">
                     <div class="progress-bar-bg" onclick="seek(event)">
@@ -70,56 +147,98 @@
                     <button class="play-btn" onclick="togglePlay()" aria-label="再生/一時停止">
                         <svg id="play-icon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                     </button>
+                    <button class="icon-btn" onclick="playNextInPlaylist()" title="次の曲">
+                        <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- APIキー設定モーダル -->
+    <div id="api-key-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h3>🔑 YouTube API Key 設定</h3>
+            <p style="font-size:12px; color:#aaa;">YouTube Data API v3のキーを入力してください。</p>
+            <input type="password" id="api-key-input" placeholder="AIzaSy...">
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeApiKeyModal()">キャンセル</button>
+                <button class="btn-save" onclick="saveApiKey()">保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- お気に入りアーティスト一覧モーダル -->
+    <div id="fav-artists-modal" class="modal-overlay" onclick="closeFavArtistsModal(event)">
+        <div class="modal-card" style="max-height:80vh;" onclick="event.stopPropagation()">
+            <h3>⭐ お気に入りアーティスト</h3>
+            <p style="font-size:12px; color:#aaa;">選択するとアルバムや楽曲を検索・表示します。</p>
+            <div id="fav-artists-list" style="overflow-y:auto; max-height:45vh; display:flex; flex-direction:column; gap:6px;"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeFavArtistsModal()">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- プレイリスト/アルバム詳細モーダル -->
+    <div id="playlist-modal" class="modal-overlay" onclick="closePlaylistModal(event)">
+        <div class="modal-card" style="max-width: 620px; max-height: 80vh;" onclick="event.stopPropagation()">
+            <div style="display: flex; gap: 14px; align-items: center;">
+                <img id="modal-thumb" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;" src="" alt="Art">
+                <div style="flex:1; min-width:0;">
+                    <h3 id="modal-title" style="font-size:16px; line-height:1.3; margin-bottom:4px;"></h3>
+                    <p id="modal-author" style="color:#aaa; font-size:12px; margin-bottom:8px;"></p>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn-save" style="padding:4px 12px; font-size:12px;" onclick="playCurrentPlaylist(0)">最初から再生</button>
+                        <button class="btn-cancel" style="padding:4px 12px; font-size:12px;" onclick="shuffleCurrentPlaylist()">シャッフル</button>
+                    </div>
+                </div>
+            </div>
+            <div id="modal-tracks" style="overflow-y: auto; max-height: 45vh; display: flex; flex-direction: column; gap: 6px; margin-top: 10px;"></div>
+        </div>
+    </div>
+
     <script>
         let player, isPlaying = false, isRepeat = false;
+        let activePlaylist = [], currentPlaylistIndex = 0;
+        let currentTrackMeta = { videoId: '', title: '', artist: '', channelId: '', thumb: '' };
 
-        function getUrlParams() {
-            const params = new URLSearchParams(window.location.search);
-            return {
-                action: params.get('action'),
-                id: params.get('id'),
-                title: params.get('title'),
-                artist: params.get('artist'),
-                thumb: params.get('thumb')
-            };
-        }
-
-        function onYouTubeIframeAPIReady() {
-            const data = getUrlParams();
-            const initialId = data.id || 'Qxp-TYiShH0'; // デフォルト動画
-
-            player = new YT.Player('yt-player', {
-                videoId: initialId,
-                playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'modestbranding': 1, 'rel': 0, 'loop': 1 },
-                events: {
-                    'onReady': () => {
-                        if (data.id) {
-                            applyTrackData(data);
+        // 🎧 Alexa Presentation for HTML Web API の初期化とメッセージ受信処理
+        if (window.Alexa) {
+            Alexa.create({ version: '1.0' })
+                .then((alexaClient) => {
+                    console.log('Alexa Client initialized successfully!');
+                    
+                    // Alexaからのメッセージを受信するリスナー
+                    alexaClient.message.listen((message) => {
+                        console.log('Received message from Alexa Skill:', message);
+                        
+                        if (message.action === 'PLAY_VIDEO') {
+                            loadAndPlay(message.videoId, message.title, message.artist, '', message.thumb);
+                        } else if (message.action === 'PLAY_PLAYLIST') {
+                            openPlaylistModal(message.playlistId, message.title, message.artist, message.thumb).then(() => {
+                                playCurrentPlaylist(0);
+                            });
                         }
-                    },
-                    'onStateChange': onPlayerStateChange
-                }
-            });
-            setInterval(updateProgress, 250);
+                    });
+                })
+                .catch((error) => {
+                    console.error('Failed to initialize Alexa Client:', error);
+                });
         }
 
-        function applyTrackData(data) {
-            if (data.title) document.getElementById('ui-title').innerText = decodeURIComponent(data.title);
-            if (data.artist) document.getElementById('ui-artist').innerText = decodeURIComponent(data.artist);
-            if (data.thumb) document.getElementById('ui-thumb').src = decodeURIComponent(data.thumb);
+        // YouTube Iframe API Ready
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('yt-player', {
+                videoId: '',
+                playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'modestbranding': 1, 'rel': 0 },
+                events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }
+            });
+        }
 
-            if (data.action === 'PLAY_PLAYLIST') {
-                document.getElementById('status').innerText = '▶ 再生中 (アルバム)';
-                player.loadPlaylist({ listType: 'playlist', list: data.id });
-            } else {
-                document.getElementById('status').innerText = '▶ 再生中 (曲)';
-                player.loadVideoById(data.id);
-            }
+        function onPlayerReady() {
+            setInterval(updateProgress, 250);
+            updateFavButtonState();
         }
 
         function onPlayerStateChange(event) {
@@ -128,7 +247,8 @@
                 isPlaying = true;
                 icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
             } else if (event.data === YT.PlayerState.ENDED) {
-                if (isRepeat) player.playVideo();
+                if (isRepeat) { player.playVideo(); }
+                else if (activePlaylist.length > 0 && currentPlaylistIndex + 1 < activePlaylist.length) { playNextInPlaylist(); }
                 else { isPlaying = false; icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; }
             } else {
                 isPlaying = false;
@@ -150,6 +270,273 @@
             const rect = e.currentTarget.getBoundingClientRect();
             if (player && player.getDuration) player.seekTo(((e.clientX - rect.left) / rect.width) * player.getDuration(), true);
         }
+
+        function getApiKey() { return localStorage.getItem('yt_api_key') || ''; }
+        function openApiKeyModal() { document.getElementById('api-key-input').value = getApiKey(); document.getElementById('api-key-modal').classList.add('active'); }
+        function closeApiKeyModal() { document.getElementById('api-key-modal').classList.remove('active'); }
+        function saveApiKey() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if (key) { localStorage.setItem('yt_api_key', key); closeApiKeyModal(); }
+        }
+
+        function getFavArtists() {
+            try { return JSON.parse(localStorage.getItem('fav_artists') || '[]'); } catch(e) { return []; }
+        }
+
+        function toggleCurrentArtistFavorite() {
+            if (!currentTrackMeta.artist) { return; }
+            let favs = getFavArtists();
+            const idx = favs.findIndex(f => f.name === currentTrackMeta.artist);
+            if (idx >= 0) {
+                favs.splice(idx, 1);
+            } else {
+                favs.push({ channelId: currentTrackMeta.channelId, name: currentTrackMeta.artist, thumb: currentTrackMeta.thumb });
+            }
+            localStorage.setItem('fav_artists', JSON.stringify(favs));
+            updateFavButtonState();
+        }
+
+        function updateFavButtonState() {
+            const btn = document.getElementById('fav-btn');
+            const favs = getFavArtists();
+            const isSaved = currentTrackMeta.artist && favs.some(f => f.name === currentTrackMeta.artist);
+            if (isSaved) {
+                btn.className = 'fav-artist-btn saved';
+                btn.innerHTML = '<span>★ 登録済み</span>';
+            } else {
+                btn.className = 'fav-artist-btn';
+                btn.innerHTML = '<span>⭐ アーティスト登録</span>';
+            }
+        }
+
+        function openFavArtistsModal() {
+            const list = document.getElementById('fav-artists-list');
+            const favs = getFavArtists();
+            list.innerHTML = '';
+            if (favs.length === 0) {
+                list.innerHTML = `<div class="status-msg">お気に入りアーティストがまだ登録されていません。</div>`;
+            } else {
+                favs.forEach(artist => {
+                    const el = document.createElement('div');
+                    el.className = 'result-item';
+                    el.innerHTML = `
+                        <img src="${artist.thumb || 'https://placehold.co/100x100/222/fff?text=Artist'}" class="result-thumb" style="border-radius:50%;">
+                        <div class="result-info"><div class="result-title">${escapeHtml(artist.name)}</div></div>
+                        <span class="badge">表示</span>
+                    `;
+                    el.onclick = () => {
+                        closeFavArtistsModal();
+                        loadArtistAlbums(artist.name, artist.thumb);
+                    };
+                    list.appendChild(el);
+                });
+            }
+            document.getElementById('fav-artists-modal').classList.add('active');
+        }
+
+        function closeFavArtistsModal(e) { document.getElementById('fav-artists-modal').classList.remove('active'); }
+
+        async function loadArtistAlbums(artistName, thumbUrl) {
+            const apiKey = getApiKey();
+            if (!apiKey) { openApiKeyModal(); return; }
+
+            document.getElementById('modal-title').innerText = artistName + ' のアルバム';
+            document.getElementById('modal-author').innerText = '公式・関連リリース';
+            document.getElementById('modal-thumb').src = thumbUrl || 'https://placehold.co/200x200/222/fff?text=Artist';
+            document.getElementById('modal-tracks').innerHTML = `<div class="status-msg">検索中...</div>`;
+            document.getElementById('playlist-modal').classList.add('active');
+
+            try {
+                const query = `${artistName} アルバム`;
+                const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&maxResults=15&q=${encodeURIComponent(query)}&key=${apiKey}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                let playlists = data.items || [];
+
+                const container = document.getElementById('modal-tracks');
+                container.innerHTML = '';
+
+                if (playlists.length === 0) {
+                    container.innerHTML = `<div class="status-msg">見つかりませんでした</div>`;
+                    return;
+                }
+
+                playlists.forEach(pl => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    const plThumb = pl.snippet.thumbnails?.high?.url || thumbUrl;
+                    item.innerHTML = `
+                        <img src="${plThumb}" class="result-thumb">
+                        <div class="result-info">
+                            <div class="result-title">${escapeHtml(pl.snippet.title)}</div>
+                            <div class="result-sub">${escapeHtml(pl.snippet.channelTitle)}</div>
+                        </div>
+                        <span class="badge">開く</span>
+                    `;
+                    item.onclick = () => openPlaylistModal(pl.id.playlistId, pl.snippet.title, pl.snippet.channelTitle, plThumb);
+                    container.appendChild(item);
+                });
+            } catch (err) {
+                document.getElementById('modal-tracks').innerHTML = `<div class="status-msg error">取得に失敗しました</div>`;
+            }
+        }
+
+        async function executeSearch() {
+            const query = document.getElementById('search-input').value.trim();
+            const resultsList = document.getElementById('results-list');
+            if (!query) return;
+
+            const apiKey = getApiKey();
+            if (!apiKey) { openApiKeyModal(); return; }
+
+            resultsList.style.display = 'block';
+            resultsList.innerHTML = `<div class="status-msg">🔍 「${escapeHtml(query)}」を検索中...</div>`;
+
+            try {
+                const vUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=6&q=${encodeURIComponent(query)}&key=${apiKey}`;
+                const pUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&maxResults=4&q=${encodeURIComponent(query)}&key=${apiKey}`;
+
+                let [vRes, pRes] = await Promise.all([fetch(vUrl), fetch(pUrl)]);
+                let vData = await vRes.json();
+                let pData = await pRes.json();
+
+                renderSearchResults(vData.items || [], pData.items || []);
+            } catch (err) {
+                resultsList.innerHTML = `<div class="status-msg error">通信エラー: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function renderSearchResults(videos, playlists) {
+            const list = document.getElementById('results-list');
+            list.innerHTML = '';
+            if (videos.length === 0 && playlists.length === 0) {
+                list.innerHTML = `<div class="status-msg">見つかりませんでした。</div>`;
+                return;
+            }
+
+            if (videos.length > 0) {
+                list.appendChild(createSectionHeader('楽曲'));
+                videos.forEach(item => {
+                    const snippet = item.snippet;
+                    const title = snippet.title.replace(/ - Topic$/i, '');
+                    const artist = snippet.channelTitle.replace(/ - Topic$/i, '');
+                    const thumb = snippet.thumbnails?.high?.url;
+                    const el = createResultItem(thumb, title, artist, () => selectSingleSong(item.id.videoId, title, artist, snippet.channelId, thumb));
+                    list.appendChild(el);
+                });
+            }
+
+            if (playlists.length > 0) {
+                list.appendChild(createSectionHeader('アルバム・プレイリスト'));
+                playlists.forEach(item => {
+                    const snippet = item.snippet;
+                    const thumb = snippet.thumbnails?.high?.url;
+                    const el = createResultItem(thumb, snippet.title, snippet.channelTitle, () => openPlaylistModal(item.id.playlistId, snippet.title, snippet.channelTitle, thumb), 'PLAYLIST');
+                    list.appendChild(el);
+                });
+            }
+        }
+
+        function createSectionHeader(title) { const div = document.createElement('div'); div.className = 'section-title'; div.innerText = title; return div; }
+        function createResultItem(thumb, title, artist, onClick, badge = null) {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            div.innerHTML = `
+                <img src="${thumb || 'https://placehold.co/100x100/222/fff?text=No+Img'}" class="result-thumb">
+                <div class="result-info"><div class="result-title">${escapeHtml(title)}</div><div class="result-sub">${escapeHtml(artist)}</div></div>
+                ${badge ? `<span class="badge">${badge}</span>` : ''}
+            `;
+            div.onclick = onClick;
+            return div;
+        }
+
+        function selectSingleSong(videoId, title, artist, channelId, thumbUrl) {
+            document.getElementById('results-list').style.display = 'none';
+            activePlaylist = [];
+            loadAndPlay(videoId, title, artist, channelId, thumbUrl);
+        }
+
+        function loadAndPlay(videoId, title, artist, channelId, thumbUrl) {
+            currentTrackMeta = { videoId, title, artist, channelId, thumb: thumbUrl };
+            document.getElementById('ui-title').innerText = title;
+            document.getElementById('ui-artist').innerText = artist;
+            document.getElementById('ui-thumb').src = thumbUrl || 'https://placehold.co/400x400/222/fff?text=Music';
+            updateFavButtonState();
+            if (player && player.loadVideoById) player.loadVideoById(videoId);
+        }
+
+        async function openPlaylistModal(playlistId, title, author, thumbUrl) {
+            document.getElementById('results-list').style.display = 'none';
+            const apiKey = getApiKey();
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-author').innerText = author;
+            document.getElementById('modal-thumb').src = thumbUrl || 'https://placehold.co/200x200/222/fff?text=Music';
+            document.getElementById('modal-tracks').innerHTML = `<div class="status-msg">トラック一覧を取得中...</div>`;
+            document.getElementById('playlist-modal').classList.add('active');
+
+            try {
+                const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${apiKey}`);
+                const data = await res.json();
+                activePlaylist = (data.items || []).map(item => ({
+                    videoId: item.snippet.resourceId.videoId,
+                    title: item.snippet.title.replace(/ - Topic$/i, ''),
+                    artist: item.snippet.videoOwnerChannelTitle || author,
+                    channelId: item.snippet.videoOwnerChannelId || '',
+                    thumb: item.snippet.thumbnails?.high?.url || thumbUrl
+                })).filter(t => t.title !== 'Private video' && t.title !== 'Deleted video');
+                renderModalTracks();
+            } catch (err) {
+                document.getElementById('modal-tracks').innerHTML = `<div class="status-msg error">取得失敗</div>`;
+            }
+        }
+
+        function renderModalTracks() {
+            const container = document.getElementById('modal-tracks');
+            container.innerHTML = '';
+            activePlaylist.forEach((track, idx) => {
+                const item = document.createElement('div');
+                item.className = 'result-item';
+                item.innerHTML = `
+                    <div style="width:20px; color:#666; font-weight:bold; font-size:12px; text-align:center;">${idx + 1}</div>
+                    <img src="${track.thumb}" class="result-thumb" style="width:36px; height:36px;">
+                    <div class="result-info"><div class="result-title" style="font-size:13px;">${escapeHtml(track.title)}</div></div>
+                `;
+                item.onclick = () => { closePlaylistModal(); playCurrentPlaylist(idx); };
+                container.appendChild(item);
+            });
+        }
+
+        function playCurrentPlaylist(index = 0) {
+            if (activePlaylist.length === 0) return;
+            currentPlaylistIndex = index;
+            const t = activePlaylist[currentPlaylistIndex];
+            loadAndPlay(t.videoId, t.title, t.artist, t.channelId, t.thumb);
+            closePlaylistModal();
+        }
+
+        function shuffleCurrentPlaylist() {
+            if (activePlaylist.length === 0) return;
+            for (let i = activePlaylist.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [activePlaylist[i], activePlaylist[j]] = [activePlaylist[j], activePlaylist[i]];
+            }
+            playCurrentPlaylist(0);
+        }
+
+        function playNextInPlaylist() {
+            if (activePlaylist.length > 0 && currentPlaylistIndex + 1 < activePlaylist.length) {
+                currentPlaylistIndex++;
+                playCurrentPlaylist(currentPlaylistIndex);
+            }
+        }
+
+        function closePlaylistModal(e) { document.getElementById('playlist-modal').classList.remove('active'); }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+
+        // YouTube IFrame Script Inject
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.getElementsByTagName('script')[0].parentNode.insertBefore(tag, document.getElementsByTagName('script')[0]);
     </script>
 </body>
 </html>
