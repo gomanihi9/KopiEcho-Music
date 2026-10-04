@@ -1,100 +1,155 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KopiEcho Music Player</title>
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background-color: #0d0e15; color: #ffffff; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; padding: 16px; overflow: hidden; }
-    .main-layout { display: flex; flex: 1; gap: 20px; height: 75vh; }
-    .player-box { flex: 1.4; background: #000; border-radius: 12px; overflow: hidden; }
-    #player { width: 100%; height: 100%; }
-    .info-box { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 20px; text-align: center; }
-    .status-badge { font-size: 14px; color: #00e676; background: rgba(0, 230, 118, 0.15); padding: 6px 16px; border-radius: 20px; margin-bottom: 16px; }
-    .thumb-img { width: 160px; height: 160px; border-radius: 12px; object-fit: cover; margin-bottom: 16px; background-color: #222; }
-    .song-title { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
-    .artist-name { font-size: 16px; color: #aaa; }
-    .log-box { height: 20vh; margin-top: 10px; background: #050508; border: 1px solid #222; border-radius: 8px; padding: 8px; font-family: monospace; font-size: 11px; color: #00ff66; overflow-y: auto; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KopiEcho Music Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { width: 960px; height: 480px; overflow: hidden; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; background-color: #0d0d12; color: #ffffff; }
+
+        #player-container { position: fixed; top: 0; left: 0; width: 960px; height: 480px; z-index: 1; pointer-events: none; opacity: 0.4; }
+        #player-container iframe { width: 960px; height: 540px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: none; }
+        .dark-overlay { position: fixed; top: 0; left: 0; width: 960px; height: 480px; background: radial-gradient(circle at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.85) 100%); z-index: 2; }
+
+        .main-layout { position: relative; z-index: 3; display: flex; flex-direction: column; width: 960px; height: 480px; padding: 24px 36px; justify-content: center; }
+        
+        .player-content { display: flex; align-items: center; justify-content: center; gap: 48px; width: 100%; }
+        .album-art-box { width: 220px; height: 220px; border-radius: 20px; overflow: hidden; box-shadow: 0 15px 35px rgba(0,0,0,0.7); background: #1a1b26; flex-shrink: 0; }
+        .album-art-box img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .meta-controls { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+        .status-badge { font-size: 12px; color: #1db954; background: rgba(29, 185, 84, 0.15); padding: 4px 12px; border-radius: 20px; width: fit-content; margin-bottom: 10px; font-weight: 600; }
+        .song-title { font-size: 28px; font-weight: 800; line-height: 1.2; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .artist-name { font-size: 16px; color: #b3b3b3; font-weight: 500; margin-bottom: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .progress-area { width: 100%; margin-bottom: 20px; }
+        .progress-bar-bg { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 3px; cursor: pointer; position: relative; overflow: hidden; }
+        .progress-fill { width: 0%; height: 100%; background: #ff2a2a; border-radius: 3px; transition: width 0.1s linear; }
+
+        .control-btns { display: flex; align-items: center; gap: 20px; }
+        .play-btn { width: 52px; height: 52px; border-radius: 50%; background: #ffffff; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.4); transition: transform 0.1s; flex-shrink: 0; }
+        .play-btn:active { transform: scale(0.92); }
+        .play-btn svg { fill: #000; width: 24px; height: 24px; }
+
+        .icon-btn { background: none; border: none; color: rgba(255, 255, 255, 0.5); cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: color 0.2s; }
+        .icon-btn.active { color: #ff2a2a; }
+        .icon-btn svg { width: 22px; height: 22px; fill: currentColor; }
+    </style>
 </head>
 <body>
 
-  <div class="main-layout">
-    <div class="player-box"><div id="player"></div></div>
-    <div class="info-box">
-      <div id="status" class="status-badge">待機中</div>
-      <img id="thumb" class="thumb-img" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Thumbnail">
-      <div id="title" class="song-title">マイミュージック</div>
-      <div id="artist" class="artist-name">「曲」または「アルバム」と話しかけてください</div>
+    <!-- YouTube 背景プレイヤー -->
+    <div id="player-container"><div id="yt-player"></div></div>
+    <div class="dark-overlay"></div>
+
+    <div class="main-layout">
+        <div class="player-content">
+            <!-- アルバムアート -->
+            <div class="album-art-box">
+                <img id="ui-thumb" src="https://placehold.co/400x400/222/fff?text=KopiEcho" alt="Album Art">
+            </div>
+            <!-- メタデータ＆コントロール -->
+            <div class="meta-controls">
+                <div id="status" class="status-badge">音声入力を待っています...</div>
+                <div id="ui-title" class="song-title">KopiEcho Music</div>
+                <div id="ui-artist" class="artist-name">「曲」または「アルバム」と話しかけてください</div>
+                
+                <div class="progress-area">
+                    <div class="progress-bar-bg" onclick="seek(event)">
+                        <div id="ui-progress" class="progress-fill"></div>
+                    </div>
+                </div>
+
+                <div class="control-btns">
+                    <button id="repeat-btn" class="icon-btn" onclick="toggleRepeat()" title="リピート">
+                        <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+                    </button>
+                    <button class="play-btn" onclick="togglePlay()" aria-label="再生/一時停止">
+                        <svg id="play-icon" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-  <div id="log" class="log-box">[System] 初期化を開始します...</div>
 
-  <script>
-    let ytPlayer = null;
+    <script>
+        let player, isPlaying = false, isRepeat = false;
 
-    function log(msg) {
-      const logBox = document.getElementById('log');
-      logBox.innerHTML += `<br>> ${msg}`;
-      logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    // URLからパラメータを取得する関数
-    function getUrlParams() {
-      const params = new URLSearchParams(window.location.search);
-      return {
-        action: params.get('action'),
-        id: params.get('id'),
-        title: params.get('title'),
-        artist: params.get('artist'),
-        thumb: params.get('thumb')
-      };
-    }
-
-    // YouTube Iframe API 準備完了時のコールバック
-    function onYouTubeIframeAPIReady() {
-      log('YouTube API 準備完了');
-      ytPlayer = new YT.Player('player', {
-        height: '100%',
-        width: '100%',
-        playerVars: { 'autoplay': 1, 'controls': 1 },
-        events: {
-          'onReady': () => {
-            log('YouTube プレイヤー準備完了');
-            checkUrlAndPlay(); // プレイヤーの準備ができたらURLをチェック
-          },
-          'onError': (e) => log('YouTube 再生エラー: Code ' + e.data)
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                action: params.get('action'),
+                id: params.get('id'),
+                title: params.get('title'),
+                artist: params.get('artist'),
+                thumb: params.get('thumb')
+            };
         }
-      });
-    }
 
-    // URLを解析して再生を実行
-    function checkUrlAndPlay() {
-      const data = getUrlParams();
-      
-      if (!data.id) {
-        log('URLに再生データが含まれていません。音声入力を待機します。');
-        return;
-      }
+        function onYouTubeIframeAPIReady() {
+            const data = getUrlParams();
+            const initialId = data.id || 'Qxp-TYiShH0'; // デフォルト動画
 
-      log(`データ受信: ${data.action} / ID: ${data.id}`);
-      
-      // UIを更新
-      if (data.title) document.getElementById('title').innerText = decodeURIComponent(data.title);
-      if (data.artist) document.getElementById('artist').innerText = decodeURIComponent(data.artist);
-      if (data.thumb) document.getElementById('thumb').src = decodeURIComponent(data.thumb);
-      
-      // 再生処理
-      if (data.action === 'PLAY_VIDEO') {
-        document.getElementById('status').innerText = '▶ 再生中 (曲)';
-        ytPlayer.loadVideoById(data.id);
-      } else if (data.action === 'PLAY_PLAYLIST') {
-        document.getElementById('status').innerText = '▶ 再生中 (アルバム)';
-        ytPlayer.loadPlaylist({ listType: 'playlist', list: data.id });
-      }
-    }
-  </script>
+            player = new YT.Player('yt-player', {
+                videoId: initialId,
+                playerVars: { 'autoplay': 1, 'controls': 0, 'disablekb': 1, 'modestbranding': 1, 'rel': 0, 'loop': 1 },
+                events: {
+                    'onReady': () => {
+                        if (data.id) {
+                            applyTrackData(data);
+                        }
+                    },
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+            setInterval(updateProgress, 250);
+        }
+
+        function applyTrackData(data) {
+            if (data.title) document.getElementById('ui-title').innerText = decodeURIComponent(data.title);
+            if (data.artist) document.getElementById('ui-artist').innerText = decodeURIComponent(data.artist);
+            if (data.thumb) document.getElementById('ui-thumb').src = decodeURIComponent(data.thumb);
+
+            if (data.action === 'PLAY_PLAYLIST') {
+                document.getElementById('status').innerText = '▶ 再生中 (アルバム)';
+                player.loadPlaylist({ listType: 'playlist', list: data.id });
+            } else {
+                document.getElementById('status').innerText = '▶ 再生中 (曲)';
+                player.loadVideoById(data.id);
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            const icon = document.getElementById('play-icon');
+            if (event.data === YT.PlayerState.PLAYING) {
+                isPlaying = true;
+                icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            } else if (event.data === YT.PlayerState.ENDED) {
+                if (isRepeat) player.playVideo();
+                else { isPlaying = false; icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; }
+            } else {
+                isPlaying = false;
+                icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+            }
+        }
+
+        function togglePlay() { if (player && player.getPlayerState) isPlaying ? player.pauseVideo() : player.playVideo(); }
+        function toggleRepeat() { isRepeat = !isRepeat; document.getElementById('repeat-btn').classList.toggle('active', isRepeat); }
+
+        function updateProgress() {
+            if (player && player.getCurrentTime && player.getDuration) {
+                const dur = player.getDuration();
+                if (dur > 0) document.getElementById('ui-progress').style.width = ((player.getCurrentTime() / dur) * 100) + '%';
+            }
+        }
+
+        function seek(e) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            if (player && player.getDuration) player.seekTo(((e.clientX - rect.left) / rect.width) * player.getDuration(), true);
+        }
+    </script>
 </body>
 </html>
